@@ -1,12 +1,12 @@
 import requests
 import urllib
-from pprint import pprint
 from textblob import TextBlob
 from textblob.sentiments import NaiveBayesAnalyzer
+from pprint import pprint
 
 response = requests.get('https://api.jsonbin.io/b/59d0f30408be13271f7df29c').json()
 APP_ACCESS_TOKEN = response['access_token']
-BASE_URL = 'http://api.instagram.com/v1/'
+BASE_URL = 'https://api.instagram.com/v1/'
 
 def owner_info():
     r = requests.get('%susers/self/?access_token=%s' %  (BASE_URL,APP_ACCESS_TOKEN)).json()
@@ -18,7 +18,6 @@ def owner_info():
     else:
         print "status code received does not match"
 
-owner_info()
 def owner_post():
     r = requests.get('%susers/self/media/recent/?access_token=%s' %  (BASE_URL,APP_ACCESS_TOKEN)).json()
     if r['meta']['code']==200:
@@ -61,27 +60,27 @@ def get_media_id(uname):
     user_id = get_user_id(uname)
     r = requests.get('%susers/%s/media/recent/?access_token=%s' % (BASE_URL, user_id, APP_ACCESS_TOKEN)).json()
     if r['meta']['code'] == 200:
-        return r['data'][1]['id']
+        return r['data'][0]['id']
     else:
         print "status code is wrong"
 
 def like_post(uname):
     media_id = get_media_id(uname)
     payload ={"access_token": APP_ACCESS_TOKEN}
-    url= BASE_URL + 'media/%s/likes' % (media_id)
+    url= BASE_URL + 'media/%s/likes' % media_id
     r =requests.post(url,payload).json()
-    if r['meta']['code']==200:
+    if r['meta']['code'] == 200:
         print "like successful"
     else:
         print "like unsuccessful"
 
 def comment_post(uname):
     media_id=get_media_id(uname)
-    comment =raw_input("kya bolna chahte ho ?")
+    comment =raw_input("what is your comment")
     payload = {"access_token": APP_ACCESS_TOKEN, "text": comment}
-    url = BASE_URL + 'media/%s/comments' % (media_id)
+    url = BASE_URL + 'media/%s/comments' % media_id
     r = requests.post(url, payload).json()
-    if r['meta']['code']==200:
+    if r['meta']['code'] == 200:
         print "comment successful"
     else:
         print "comment unsuccessful"
@@ -89,11 +88,24 @@ def comment_post(uname):
 def deleat_comment(uname):
     media_id = get_media_id(uname)
     r =requests.get("%smedia/%s/comments?access_token=%s" %(BASE_URL,media_id,APP_ACCESS_TOKEN)).json()
-    if r['meta']['code']==200:
-        if len(r['data'])>0:
+    if r['meta']['code'] == 200:
+        if len(r['data']) > 0:
             for index in range(0,len(r['data'])):
-                cmnt_id =r['data']['index']['id']
-                cmnt_text = r['data'][index]['text']
+                comment_id =r['data'][index]['id']
+                comment_text = r['data'][index]['text']
+                blob = TextBlob(comment_text, analyzer=NaiveBayesAnalyzer())
+                if blob.sentiment.p_neg > blob.sentiment.p_pos:
+                    print 'Negative comment : %s' % comment_text
+                    r = requests.delete('%smedia/%s/comments/%s/?access_token=%s' % (
+                    BASE_URL, media_id, comment_id, APP_ACCESS_TOKEN)).json()
+                    if r['meta']['code'] == 200:
+                        print 'Comment successfully deleted!'
+                    else:
+                        print 'Could not delete the comment'
+                else:
+
+                    print comment_text + 'is a positive comment'
+
         else:
             print "kuch nahi mila"
     else:
